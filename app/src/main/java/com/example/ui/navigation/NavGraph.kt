@@ -23,6 +23,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+
 import com.example.ui.home.HomeScreen
 import com.example.ui.settings.SettingsScreen
 
@@ -43,89 +44,7 @@ fun MainNavGraph() {
     val navController = rememberNavController()
     var showProfileMenu by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Arrow TV", color = MaterialTheme.colorScheme.primary) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                ),
-                actions = {
-                    IconButton(onClick = { showProfileMenu = true }) {
-                        Icon(Icons.Filled.AccountCircle, contentDescription = "Profile", tint = MaterialTheme.colorScheme.onBackground)
-                    }
-                    DropdownMenu(
-                        expanded = showProfileMenu,
-                        onDismissRequest = { showProfileMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Guest") },
-                            onClick = { showProfileMenu = false },
-                            enabled = false // Just a label
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Login") },
-                            onClick = { showProfileMenu = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Setting") },
-                            onClick = { 
-                                showProfileMenu = false
-                                navController.navigate(Screen.Settings.route) {
-                                    launchSingleTop = true
-                                }
-                            }
-                        )
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            val navBackStackEntry by navController.currentBackStackEntryAsState()
-            val currentDestination = navBackStackEntry?.destination
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                Surface(
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-                    tonalElevation = 8.dp,
-                    shadowElevation = 8.dp
-                ) {
-                    androidx.compose.foundation.layout.Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        items.forEach { screen ->
-                            val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                            IconButton(
-                                onClick = {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = screen.icon,
-                                    contentDescription = screen.title,
-                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         NavHost(
             navController, 
             startDestination = Screen.Movies.route,
@@ -144,4 +63,3 @@ fun MainNavGraph() {
         }
     }
 }
-

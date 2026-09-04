@@ -1,4 +1,28 @@
+import java.util.Properties
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+
+val versionPropsFile = file("version.properties")
+val versionProps = Properties()
+if (!versionPropsFile.exists()) {
+    versionProps["VERSION_CODE"] = "2"
+    versionProps["VERSION_NAME"] = "1.0.2"
+    versionProps.store(FileOutputStream(versionPropsFile), null)
+}
+versionProps.load(FileInputStream(versionPropsFile))
+var vCode = (versionProps["VERSION_CODE"] as String).toInt()
+val isBuildingApk = gradle.startParameter.taskNames.any { it.contains("assemble") || it.contains("bundle") }
+if (isBuildingApk) {
+    vCode += 1
+    versionProps["VERSION_CODE"] = vCode.toString()
+    if (versionProps["VERSION_NAME"] == null) {
+        versionProps["VERSION_NAME"] = "1.2.0"
+    }
+    versionProps.store(FileOutputStream(versionPropsFile), null)
+}
+val vName = versionProps["VERSION_NAME"] as String
+
 
 plugins {
   alias(libs.plugins.android.application)
@@ -14,11 +38,11 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.arrowtv.vksmsb"
+    applicationId = "com.arrowflix.app"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = vCode
+    versionName = vName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -93,6 +117,7 @@ dependencies {
   implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
+  implementation("androidx.webkit:webkit:1.11.0")
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
