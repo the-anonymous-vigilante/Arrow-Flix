@@ -11,8 +11,14 @@ class WebAppInterface(
     private val context: Context,
     private val dataStore: SettingsDataStore,
     private val scope: CoroutineScope,
+    private val onNavigationChanged: (canGoBack: Boolean, url: String) -> Unit = { _, _ -> },
     private val onShowUpdates: () -> Unit
 ) {
+    @JavascriptInterface
+    fun notifyNavigation(canGoBack: Boolean, url: String) {
+        onNavigationChanged(canGoBack, url)
+    }
+
     @JavascriptInterface
     fun openAppUpdates() {
         onShowUpdates()

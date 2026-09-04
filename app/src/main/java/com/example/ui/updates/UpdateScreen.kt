@@ -2,6 +2,7 @@ package com.example.ui.updates
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -119,6 +120,10 @@ fun UpdateScreen(
     }
 
     var expandedVersion by remember { mutableStateOf<String?>("v1.2.0") }
+
+    BackHandler {
+        onDismiss()
+    }
 
     Dialog(
         onDismissRequest = onDismiss,

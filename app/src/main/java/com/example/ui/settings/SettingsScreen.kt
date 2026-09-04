@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -74,8 +75,34 @@ fun SettingsScreen(onDismiss: () -> Unit = {}) {
     var showSpeedTest by remember { mutableStateOf(false) }
     var showAppUpdates by remember { mutableStateOf(false) }
     var showProxyConfigDialog by remember { mutableStateOf(false) }
+    var showNameDialog by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf(profileName) }
     var zoomQrDrawableId by remember { mutableStateOf<Int?>(null) }
     var zoomQrTitle by remember { mutableStateOf("") }
+
+    BackHandler {
+        when {
+            zoomQrDrawableId != null -> {
+                zoomQrDrawableId = null
+                zoomQrTitle = ""
+            }
+            showNameDialog -> {
+                showNameDialog = false
+            }
+            showProxyConfigDialog -> {
+                showProxyConfigDialog = false
+            }
+            showSpeedTest -> {
+                showSpeedTest = false
+            }
+            showAppUpdates -> {
+                showAppUpdates = false
+            }
+            else -> {
+                onDismiss()
+            }
+        }
+    }
 
     val displayCaps = remember { DisplayCapabilityUtils.getDisplayCapabilities(context) }
 
@@ -136,9 +163,6 @@ fun SettingsScreen(onDismiss: () -> Unit = {}) {
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(14.dp))
-
-                    var showNameDialog by remember { mutableStateOf(false) }
-                    var newName by remember { mutableStateOf(profileName) }
 
                     val launcher = rememberLauncherForActivityResult(
                         ActivityResultContracts.GetContent()

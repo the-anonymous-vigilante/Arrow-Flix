@@ -3,6 +3,7 @@ package com.example.ui.feedback
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -58,6 +59,10 @@ fun FeedbackScreen(
     var isSubmitting by remember { mutableStateOf(false) }
     var isSuccess by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    BackHandler {
+        onDismiss()
+    }
 
     Dialog(
         onDismissRequest = onDismiss,

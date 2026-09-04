@@ -13,6 +13,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -20,6 +21,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -43,6 +45,7 @@ import android.content.pm.PackageManager
 import com.example.data.SettingsDataStore
 import com.example.ui.updates.UpdateState
 import com.example.ui.updates.UpdateViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.ByteArrayInputStream
 
@@ -99,23 +102,79 @@ fun HomeScreen() {
     var customView by remember { mutableStateOf<View?>(null) }
     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
     
-    BackHandler(enabled = showFullScreenMenu) {
-        showFullScreenMenu = false
-    }
+    var lastBackPressTime by remember { mutableLongStateOf(0L) }
     
-    BackHandler(enabled = customView != null) {
-        val activity = context.findActivity()
-        activity?.let { act ->
-            act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            act.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+    BackHandler(enabled = true) {
+        when {
+            customView != null -> {
+                val activity = context.findActivity()
+                activity?.let { act ->
+                    act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    @Suppress("DEPRECATION")
+                    act.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                }
+                customViewCallback?.onCustomViewHidden()
+                customView = null
+                customViewCallback = null
+                webViewRef?.evaluateJavascript(
+                    "if (document.fullscreenElement) { document.exitFullscreen(); }",
+                    null
+                )
+            }
+            showFullScreenMenu -> {
+                showFullScreenMenu = false
+            }
+            showSettings -> {
+                showSettings = false
+            }
+            showFeedback -> {
+                showFeedback = false
+            }
+            showAppUpdates -> {
+                showAppUpdates = false
+            }
+            else -> {
+                val wv = webViewRef
+                val canWvBack = wv?.canGoBack() == true
+                val currentUrl = wv?.url?.trim()?.trimEnd('/') ?: ""
+                val isHome = currentUrl.isEmpty() ||
+                             currentUrl == "https://arrowtv.net" ||
+                             currentUrl == "http://arrowtv.net" ||
+                             currentUrl.endsWith("arrowtv.net")
+
+                if (canWvBack) {
+                    wv?.goBack()
+                    canGoBack = wv?.canGoBack() ?: false
+                } else if (!isHome) {
+                    wv?.evaluateJavascript(
+                        """
+                        (function() {
+                            if (window.history.length > 1) {
+                                window.history.back();
+                                return 'back';
+                            } else {
+                                window.location.href = 'https://arrowtv.net/';
+                                return 'home';
+                            }
+                        })();
+                        """.trimIndent()
+                    ) { res ->
+                        if (res == null || res == "\"home\"") {
+                            wv?.loadUrl("https://arrowtv.net/")
+                        }
+                    }
+                } else {
+                    val now = System.currentTimeMillis()
+                    if (now - lastBackPressTime < 2000L) {
+                        val activity = context.findActivity()
+                        activity?.finish()
+                    } else {
+                        lastBackPressTime = now
+                        Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
-        customViewCallback?.onCustomViewHidden()
-        customView = null
-        customViewCallback = null
-    }
-    
-    BackHandler(enabled = customView == null && canGoBack) {
-        webViewRef?.goBack()
     }
     
     LaunchedEffect(proxyUrl) {
@@ -223,10 +282,28 @@ fun HomeScreen() {
                     settings.setSupportZoom(true)
                     settings.builtInZoomControls = true
                     settings.displayZoomControls = false
+                    isFocusable = true
+                    isFocusableInTouchMode = true
                     
-                    addJavascriptInterface(WebAppInterface(context, dataStore, scope) {
-                        showAppUpdates = true
-                    }, "Android")
+                    addJavascriptInterface(WebAppInterface(
+                        context = context,
+                        dataStore = dataStore,
+                        scope = scope,
+                        onNavigationChanged = { canBack, url ->
+                            scope.launch(Dispatchers.Main) {
+                                val wvCanBack = webViewRef?.canGoBack() == true
+                                val cleanUrl = url.trim().trimEnd('/')
+                                val isHome = cleanUrl.isEmpty() ||
+                                             cleanUrl == "https://arrowtv.net" ||
+                                             cleanUrl == "http://arrowtv.net" ||
+                                             cleanUrl.endsWith("arrowtv.net")
+                                canGoBack = wvCanBack || (!isHome && canBack)
+                            }
+                        },
+                        onShowUpdates = {
+                            showAppUpdates = true
+                        }
+                    ), "Android")
                     
                     webChromeClient = object : WebChromeClient() {
                         override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
@@ -528,6 +605,32 @@ fun HomeScreen() {
                                         }
                                     }
                                 }, 1000);
+                                
+                                // 4. Single-Page App history listener to sync native back gesture
+                                (function() {
+                                    if (window._routeListenerAttached) return;
+                                    window._routeListenerAttached = true;
+                                    function syncNav() {
+                                        if (window.Android && window.Android.notifyNavigation) {
+                                            var canBack = window.history.length > 1;
+                                            window.Android.notifyNavigation(canBack, window.location.href);
+                                        }
+                                    }
+                                    var origPush = history.pushState;
+                                    history.pushState = function() {
+                                        origPush.apply(history, arguments);
+                                        setTimeout(syncNav, 150);
+                                    };
+                                    var origReplace = history.replaceState;
+                                    history.replaceState = function() {
+                                        origReplace.apply(history, arguments);
+                                        setTimeout(syncNav, 150);
+                                    };
+                                    window.addEventListener('popstate', function() {
+                                        setTimeout(syncNav, 150);
+                                    });
+                                    setTimeout(syncNav, 300);
+                                })();
                             """.trimIndent()
                             
                             view?.evaluateJavascript(injectCustomSettingsJs, null)
@@ -575,6 +678,38 @@ fun HomeScreen() {
                     .background(Color.Black.copy(alpha = 0.5f), CircleShape)
             ) {
                 Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
+            }
+        }
+        
+        if (customView == null && !showFullScreenMenu && canGoBack && !showSettings && !showAppUpdates && !showFeedback) {
+            IconButton(
+                onClick = {
+                    val wv = webViewRef
+                    if (wv?.canGoBack() == true) {
+                        wv.goBack()
+                        canGoBack = wv.canGoBack()
+                    } else {
+                        wv?.evaluateJavascript(
+                            """
+                            (function() {
+                                if (window.history.length > 1) {
+                                    window.history.back();
+                                } else {
+                                    window.location.href = 'https://arrowtv.net/';
+                                }
+                            })();
+                            """.trimIndent(),
+                            null
+                        )
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(top = 16.dp, start = 16.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
         }
         
